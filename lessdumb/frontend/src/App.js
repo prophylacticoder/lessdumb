@@ -27,11 +27,11 @@ class GameGrid extends React.Component {
       match: false,
       session: []
       },
-                  running: false,
                   counter: 0,
     }
    this.setSession = this.setSession.bind(this);
    this.playGame = this.playGame.bind(this);
+   this.runTheGame = this.runTheGame.bind(this);
   }
 
   componentDidMount() {
@@ -51,20 +51,20 @@ class GameGrid extends React.Component {
   }
 
   playGame() {
+    console.log(this.props.status);
     switch (this.props.status) {
       case 'playing':
         this.props.changeStatus('paused');
         break;
       case 'paused':
         this.props.changeStatus('playing');
+        this.runTheGame();
         break;
       case 'ready':
         let elem = document.getElementById('screen-phrase');
         elem.animate([
           {opacity: 1},
           {opacity: 0},
-
-
         ],
          {
           duration: 1500,
@@ -73,6 +73,7 @@ class GameGrid extends React.Component {
           ).play();
         setTimeout(() => (elem.style.display = 'none'), 1400);
         this.props.changeStatus('playing');
+        this.runTheGame();
         break;
     }
   }
@@ -112,133 +113,127 @@ class GameGrid extends React.Component {
     this.setState({audio: {...this.state.audio, session: sessions[1]}, visual: {...this.state.visual, session: sessions[0]}});
   }
 
+runTheGame() {
+  setTimeout(() => {
+    if (this.props.status == 'playing') {
+      const fBtnPressed = () => {
+        if (this.props.btnPressed.length)
+           if (this.props.btnPressed.indexOf('S') >= 0)
+            if (this.state.visual.match) {
+              this.setState({visual: {...this.state.visual, correct: this.state.visual.correct + 1, match: false}});
+                }
+                else this.setState({visual: {...this.state.visual, incorrect: this.state.visual.incorrect + 1}});
+        if (this.props.btnPressed.indexOf('L') >= 0)
+                if (this.state.audio.match)
+                  this.setState({audio: {...this.state.audio, correct: this.state.audio.correct + 1, match: false}});
+                else this.setState({audio: {...this.state.audio, incorrect: this.state.audio.incorrect + 1}});
 
-  render() {
-    const loop = () => setTimeout(() => {
-      if (this.props.status == 'playing') {
-        const fBtnPressed = () => {
-          if (this.props.btnPressed.length)
-             if (this.props.btnPressed.indexOf('S') >= 0)
-              if (this.state.visual.match) {
-                this.setState({visual: {...this.state.visual, correct: this.state.visual.correct + 1, match: false}});
-                  }
-                  else this.setState({visual: {...this.state.visual, incorrect: this.state.visual.incorrect + 1}});
-          if (this.props.btnPressed.indexOf('L') >= 0)
-                  if (this.state.audio.match)
-                    this.setState({audio: {...this.state.audio, correct: this.state.audio.correct + 1, match: false}});
-                  else this.setState({audio: {...this.state.audio, incorrect: this.state.audio.incorrect + 1}});
+        if (this.state.audio.match && this.props.btnPressed.indexOf('S') == -1)
+          this.setState({audio: {...this.state.audio,incorrect: this.state.audio.incorrect + 1, match: false}});
 
-          if (this.state.audio.match && this.props.btnPressed.indexOf('S') == -1)
-            this.setState({audio: {...this.state.audio,incorrect: this.state.audio.incorrect + 1, match: false}});
-
-          if (this.state.visual.match && this.props.btnPressed.indexOf('L') == -1)
-            this.setState({visual: {...this.state.visual,incorrect: this.state.visual.incorrect + 1, match: false}});
-        this.props.clearKey();
-        }
+        if (this.state.visual.match && this.props.btnPressed.indexOf('L') == -1)
+          this.setState({visual: {...this.state.visual,incorrect: this.state.visual.incorrect + 1, match: false}});
+      this.props.clearKey();
+      }
 
 
-        const transitionFunc = (id) => {
-          const elem = document.getElementById(id);
-          elem.animate(
-          [
-            {backgroundColor: '#0fbbd6e6'},
-            {backgroundColor: '#800fd6'},
-            {backgroundColor: '#0fbbd6e6'}
+      const transitionFunc = (id) => {
+        const elem = document.getElementById(id);
+        elem.animate(
+        [
+          {backgroundColor: '#0fbbd6e6'},
+          {backgroundColor: '#800fd6'},
+          {backgroundColor: '#0fbbd6e6'}
 
-          ],
-            {
-             duration: 2500,
-             easing: 'cubic-bezier(.23,.42,.29,.79)'
-            }
-          ).play();
-        }
-        if (this.state.counter < this.props.nBack) {
-          transitionFunc(`cell${this.state.visual.session[this.state.counter]}`);
+        ],
+          {
+           duration: 2500,
+           easing: 'cubic-bezier(.23,.42,.29,.79)'
+          }
+        ).play();
+      }
+      if (this.state.counter < this.props.nBack) {
+        transitionFunc(`cell${this.state.visual.session[this.state.counter]}`);
+        document.getElementById(`sound${this.state.audio.session[this.state.counter]}`).play();
+        fBtnPressed();
+      }  else {
+        fBtnPressed();
+        if (this.state.audio.session[this.state.counter] == this.state.audio.session[this.state.counter - this.props.nBack]) {
+          this.setState({audio: {...this.state.audio, match: true, total: this.state.audio.total + 1}});
           document.getElementById(`sound${this.state.audio.session[this.state.counter]}`).play();
+        } else
+          document.getElementById(`sound${this.state.audio.session[this.state.counter]}`).play();
+
+
+        if (this.state.visual.session[this.state.counter] == this.state.visual.session[this.state.counter - this.props.nBack]) {
+          transitionFunc(`cell${this.state.visual.session[this.state.counter]}`);
+          this.setState({visual: {...this.state.visual, total: this.state.visual.total + 1, match: true}})
+        } else
+          transitionFunc(`cell${this.state.visual.session[this.state.counter]}`);
+      }
+
+      this.setState({counter: this.state.counter + 1});
+      this.props.changeReady(true);
+
+      if (this.state.counter < this.props.sessionLength)
+        this.runTheGame();
+      else {
+        setTimeout(() => {
           fBtnPressed();
-        }  else {
-          fBtnPressed();
-          if (this.state.audio.session[this.state.counter] == this.state.audio.session[this.state.counter - this.props.nBack]) {
-            this.setState({audio: {...this.state.audio, match: true, total: this.state.audio.total + 1}});
-            document.getElementById(`sound${this.state.audio.session[this.state.counter]}`).play();
-          } else
-            document.getElementById(`sound${this.state.audio.session[this.state.counter]}`).play();
+          this.props.changeReady(true);
+          let isLeveledUp = ((this.state.audio.correct + this.state.visual.correct) - (this.state.audio.incorrect + this.state.visual.incorrect)) / 12;
 
+             isLeveledUp = (isLeveledUp >= 0.8) ? this.props.nBack + 1 : (isLeveledUp >= 0.25) ? this.props.nBack : (this.props.nBack == 1) ? 1 : this.props.nBack - 1;
+          if (isLeveledUp > this.props.nBack) {
+            document.getElementById('level-up-audio').play();
 
-          if (this.state.visual.session[this.state.counter] == this.state.visual.session[this.state.counter - this.props.nBack]) {
-            transitionFunc(`cell${this.state.visual.session[this.state.counter]}`);
-            this.setState({visual: {...this.state.visual, total: this.state.visual.total + 1, match: true}})
-          } else
-            transitionFunc(`cell${this.state.visual.session[this.state.counter]}`);
-        }
-
-        this.setState({counter: this.state.counter + 1});
-        this.props.changeReady(true);
-
-        if (this.state.counter < this.props.sessionLength)
-          loop();
-        else {
-          setTimeout(() => {
-            fBtnPressed();
-            this.props.changeReady(true);
-            let isLeveledUp = ((this.state.audio.correct + this.state.visual.correct) - (this.state.audio.incorrect + this.state.visual.incorrect)) / 12;
-
-               isLeveledUp = (isLeveledUp >= 0.8) ? this.props.nBack + 1 : (isLeveledUp >= 0.25) ? this.props.nBack : (this.props.nBack == 1) ? 1 : this.props.nBack - 1;
-            if (isLeveledUp > this.props.nBack) {
-              document.getElementById('level-up-audio').play();
-
-            }
-            console.log({
-              nBack: isLeveledUp,
-              results: {
+          }
+          console.log({
+            nBack: isLeveledUp,
+            results: {
+            audio: this.state.audio.total,
+            visual: this.state.visual.total,
+            audioCorrect: this.state.audio.correct,
+            audioIncorrect: this.state.audio.incorrect,
+            visualCorrect: this.state.visual.correct,
+            visualIncorrect: this.state.visual.incorrect,
+          },
+           sessionLength: 10 + (isLeveledUp * 5),
+        });
+        this.props.update({
+            nBack: isLeveledUp,
+            results: {
               audio: this.state.audio.total,
               visual: this.state.visual.total,
               audioCorrect: this.state.audio.correct,
               audioIncorrect: this.state.audio.incorrect,
               visualCorrect: this.state.visual.correct,
               visualIncorrect: this.state.visual.incorrect,
-            },
-             sessionLength: 10 + (isLeveledUp * 5),
-          });
-          this.props.update({
-              nBack: isLeveledUp,
-              results: {
-                audio: this.state.audio.total,
-                visual: this.state.visual.total,
-                audioCorrect: this.state.audio.correct,
-                audioIncorrect: this.state.audio.incorrect,
-                visualCorrect: this.state.visual.correct,
-                visualIncorrect: this.state.visual.incorrect,
-            },
-              sessionLength: 10 + (isLeveledUp * 5),
-          })
-          this.setState({
-            running: false,
-            counter: 0,
-            audio: {
-              correct: 0,
-              incorrect: 0,
-              total: 0
-            },
-            visual: {
-              correct: 0,
-              incorrect: 0,
-              total: 0
-            }
-                        });
-           this.setSession();
-           this.props.changeStatus('ready');
-          }, 3500);
-        }
-      } else if (this.state.running) this.setState({running: false});
-    }, 3500);
-    console.log('rendered!!');
-    if (!this.state.running && this.props.status == 'playing') {
-      console.log('rendered!!');
-      loop();
-      if (this.props.status == 'playing')
-        this.setState({running: true});
+          },
+            sessionLength: 10 + (isLeveledUp * 5),
+        })
+        this.setState({
+          counter: 0,
+          audio: {
+            correct: 0,
+            incorrect: 0,
+            total: 0
+          },
+          visual: {
+            correct: 0,
+            incorrect: 0,
+            total: 0
+          }
+                      });
+         this.setSession();
+         this.props.changeStatus('ready');
+        }, 3500);
+      }
     }
+  }, 3500);
+}
+
+  render() {
     return (
       <div id="gameMain">
         <h1>LEVEL = {this.props.nBack}</h1>
