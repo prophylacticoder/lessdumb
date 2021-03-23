@@ -1,4 +1,4 @@
-import './App.scss';
+import './scss/App.scss';
 import {reducer} from './store/reducer/reducer.js';
 import * as actions from './store/actions.js';
 import React from 'react';
@@ -6,6 +6,7 @@ import * as Redux from 'redux';
 import * as ReactRedux from 'react-redux';
 import {store} from './store/store.js';
 import {letters} from './sounds/sounds.js';
+import Login from './login/login'
 
 const RR_Provider = ReactRedux.Provider;
 
@@ -35,6 +36,7 @@ class GameGrid extends React.Component {
   }
 
   componentDidMount() {
+    document.addEventListener("keydown", this.playGame, false);
     for(let i = 0; i < letters.length; i++) {
       let audio = document.createElement('audio');
       audio.src = letters[i].link;
@@ -50,8 +52,8 @@ class GameGrid extends React.Component {
     this.setSession();
   }
 
-  playGame() {
-    console.log(this.props.status);
+  playGame(e) {
+    if (e.type == 'click' || (e.type == 'keydown' && e.keyCode == 32))
     switch (this.props.status) {
       case 'playing':
         this.props.changeStatus('paused');
@@ -86,7 +88,8 @@ class GameGrid extends React.Component {
       for (let k = 0; k < 6; k++) {
         let randIndex;
         do
-          randIndex = Math.floor(Math.random() * (this.props.sessionLength - this.props.nBack - 1)) + this.props.nBack + 1;
+          randIndex = Math.floor(Math.random() * (this.props.sessionLength
+                                - this.props.nBack - 1)) + this.props.nBack + 1;
         while (repeated.includes(randIndex));
         repeated.push(randIndex);
       }
@@ -331,30 +334,6 @@ class GameControllers extends React.Component {
             this.props.controlPressed('L');
           }
           break;
-        case 32:
-          let playBtn = document.getElementById('playBtn');
-          playBtn.classList.remove('fa-play');
-          playBtn.classList.add('fa-pause');
-          playBtn.style.fontSize = (vw > 700) ? '10em' : '5.5em';
-          playBtn.style.opacity = '1';
-          this.props.changeStatus('paused');
-          break;
-      }
-    } else if (e.keyCode == 32) {
-      let elem = document.getElementById('playBtn');
-        switch (this.props.status) {
-         case 'ready':
-            elem.style.transition = 'font-size 1.5s, opacity, 1.5s';
-            elem.style.fontSize = (vw > 700) ? '10em' : '5.5em';
-            elem.style.opacity = '0';
-            this.props.changeStatus('playing');
-            break;
-          case 'paused':
-            elem.style.fontSize = (vw > 700) ? '10em' : '5.5em';
-            elem.classList.remove('fa-pause');
-
-            this.props.changeStatus('playing');
-            break;
       }
     }
  }
@@ -405,6 +384,7 @@ class App extends React.Component {
   render() {
     return (
       <RR_Provider store={store}>
+        <Login />
         <GameGridConnected />
         <GameControllersConnected />
       </RR_Provider>

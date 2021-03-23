@@ -1,0 +1,21 @@
+@import url(https://fonts.googleapis.com/css?family=Lato:300,400,700);
+
+
+#login-bar {
+  position: absolute;
+  display: flex;
+  button {
+    font-family: 'Lato', sans-serif;
+    background-color: transparent;
+    color: white;
+    border: 2px solid #a099cc;
+    font-size: 1em;
+    font-weight: 800;
+    padding: 10px;
+  }
+  #registerBtn {
+    background-color: #a099cc;
+    color: #fff;
+    border: none;
+  }
+}
