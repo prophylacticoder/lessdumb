@@ -1,14 +1,12 @@
 import './scss/App.scss';
-import {reducer} from './store/reducer/reducer.js';
 import * as actions from './store/actions.js';
 import React from 'react';
-import * as Redux from 'redux';
 import * as ReactRedux from 'react-redux';
 import {store} from './store/store.js';
 import {letters} from './sounds/sounds.js';
-import Login from './login/login'
+import Login from './login/'
 
-const RR_Provider = ReactRedux.Provider;
+const Provider = ReactRedux.Provider;
 
 class GameGrid extends React.Component {
   constructor(props) {
@@ -53,7 +51,7 @@ class GameGrid extends React.Component {
   }
 
   playGame(e) {
-    if (e.type == 'click' || (e.type == 'keydown' && e.keyCode == 32))
+    if (e.type === 'click' || (e.type === 'keydown' && e.keyCode === 32))
     switch (this.props.status) {
       case 'playing':
         this.props.changeStatus('paused');
@@ -76,6 +74,8 @@ class GameGrid extends React.Component {
         setTimeout(() => (elem.style.display = 'none'), 1400);
         this.props.changeStatus('playing');
         this.runTheGame();
+        break;
+      default:
         break;
     }
   }
@@ -106,7 +106,7 @@ class GameGrid extends React.Component {
           let rand;
           do
             rand = Math.floor(Math.random() * 8);
-          while (sessions[i][j-this.props.nBack] == rand);
+          while (sessions[i][j-this.props.nBack] === rand);
           sessions[i].push(rand);
         }
 
@@ -118,7 +118,7 @@ class GameGrid extends React.Component {
 
 runTheGame() {
   setTimeout(() => {
-    if (this.props.status == 'playing') {
+    if (this.props.status === 'playing') {
       const fBtnPressed = () => {
         if (this.props.btnPressed.length)
            if (this.props.btnPressed.indexOf('S') >= 0)
@@ -131,10 +131,10 @@ runTheGame() {
                   this.setState({audio: {...this.state.audio, correct: this.state.audio.correct + 1, match: false}});
                 else this.setState({audio: {...this.state.audio, incorrect: this.state.audio.incorrect + 1}});
 
-        if (this.state.audio.match && this.props.btnPressed.indexOf('S') == -1)
+        if (this.state.audio.match && this.props.btnPressed.indexOf('S') === -1)
           this.setState({audio: {...this.state.audio,incorrect: this.state.audio.incorrect + 1, match: false}});
 
-        if (this.state.visual.match && this.props.btnPressed.indexOf('L') == -1)
+        if (this.state.visual.match && this.props.btnPressed.indexOf('L') === -1)
           this.setState({visual: {...this.state.visual,incorrect: this.state.visual.incorrect + 1, match: false}});
       this.props.clearKey();
       }
@@ -161,14 +161,14 @@ runTheGame() {
         fBtnPressed();
       }  else {
         fBtnPressed();
-        if (this.state.audio.session[this.state.counter] == this.state.audio.session[this.state.counter - this.props.nBack]) {
+        if (this.state.audio.session[this.state.counter] === this.state.audio.session[this.state.counter - this.props.nBack]) {
           this.setState({audio: {...this.state.audio, match: true, total: this.state.audio.total + 1}});
           document.getElementById(`sound${this.state.audio.session[this.state.counter]}`).play();
         } else
           document.getElementById(`sound${this.state.audio.session[this.state.counter]}`).play();
 
 
-        if (this.state.visual.session[this.state.counter] == this.state.visual.session[this.state.counter - this.props.nBack]) {
+        if (this.state.visual.session[this.state.counter] === this.state.visual.session[this.state.counter - this.props.nBack]) {
           transitionFunc(`cell${this.state.visual.session[this.state.counter]}`);
           this.setState({visual: {...this.state.visual, total: this.state.visual.total + 1, match: true}})
         } else
@@ -186,7 +186,7 @@ runTheGame() {
           this.props.changeReady(true);
           let isLeveledUp = ((this.state.audio.correct + this.state.visual.correct) - (this.state.audio.incorrect + this.state.visual.incorrect)) / 12;
 
-             isLeveledUp = (isLeveledUp >= 0.8) ? this.props.nBack + 1 : (isLeveledUp >= 0.25) ? this.props.nBack : (this.props.nBack == 1) ? 1 : this.props.nBack - 1;
+             isLeveledUp = (isLeveledUp >= 0.8) ? this.props.nBack + 1 : (isLeveledUp >= 0.25) ? this.props.nBack : (this.props.nBack === 1) ? 1 : this.props.nBack - 1;
           if (isLeveledUp > this.props.nBack) {
             document.getElementById('level-up-audio').play();
 
@@ -284,32 +284,34 @@ class GameControllers extends React.Component {
 
   }
 
-  componentDidUpdate(nextProps, nextState) {
-    if (nextProps.ready) {
+  componentDidUpdate(prevProps, prevState) {
+    if (this.props.ready) {
       let visualElem = document.getElementById('visualBtn');
       let audioElem = document.getElementById('audioBtn');
         if (visualElem.classList.contains('active'))
            visualElem.classList.remove('active');
         if (audioElem.classList.contains('active'))
            audioElem.classList.remove('active');
+
+     this.props.changeReady(false);
+     this.setState({audioToggle: false, visualToggle: false});
     }
   }
 
   buttonPress(e) {
     let elem = document.getElementById('btnClick');
     // Get the portview's width
-    const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+    // const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
     elem.currentTime = 0;
 
 
-    if (this.props.status == 'playing') {
-      if ((e.target.id == 'visualBtn' || e.target.parentElement.id == 'visualBtn') && !this.state.visualToggle) {
+    if (this.props.status === 'playing') {
+      if ((e.target.id === 'visualBtn' || e.target.parentElement.id === 'visualBtn') && !this.state.visualToggle) {
         document.getElementById('visualBtn').classList.add('active');
-
         this.props.controlPressed('S');
         elem.play();
         this.setState({visualToggle: true});
-      } else if ((e.target.id == 'audioBtn' || e.target.parentElement.id == 'audioBtn') && !this.state.audioToggle) {
+      } else if ((e.target.id === 'audioBtn' || e.target.parentElement.id === 'audioBtn') && !this.state.audioToggle) {
         document.getElementById('audioBtn').classList.add('active');
         this.setState({audioToggle: true});
         elem.play();
@@ -334,16 +336,14 @@ class GameControllers extends React.Component {
             this.props.controlPressed('L');
           }
           break;
+
+        default:
+          break;
       }
     }
  }
 
-
   render() {
-    if (this.props.ready) {
-      this.props.changeReady(false);
-      this.setState({audioToggle: false, visualToggle: false})
-    }
     return (
       <div id="controllers">
         <button id="visualBtn" onClick={this.buttonPress}><i className="fas fa-eye" /></button>
@@ -377,17 +377,17 @@ const GameGridConnected = ReactRedux.connect((state) => ({
 }))(GameGrid);
 
 class App extends React.Component {
-  constructor(props) {
-    super(props);
-  }
+  // constructor(props) {
+  //   super(props);
+  // }
 
   render() {
     return (
-      <RR_Provider store={store}>
+      <Provider store={store}>
         <Login />
         <GameGridConnected />
         <GameControllersConnected />
-      </RR_Provider>
+      </Provider>
     )
   }
 }

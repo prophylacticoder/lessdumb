@@ -2,18 +2,24 @@
 
 
 #login-bar {
-  position: absolute;
+  margin:  10px 50px 0 0;
   display: flex;
+  justify-content: flex-end;
   button {
     font-family: 'Lato', sans-serif;
     background-color: transparent;
     color: white;
     border: 2px solid #a099cc;
+    border-radius: 2px;
     font-size: 1em;
     font-weight: 800;
-    padding: 10px;
+    padding: 10px 40px 10px 40px;
+    &:hover {
+      cursor: pointer;
+    }
   }
   #registerBtn {
+    margin-left: 10px;
     background-color: #a099cc;
     color: #fff;
     border: none;
