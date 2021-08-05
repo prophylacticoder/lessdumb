@@ -4,7 +4,7 @@ import React from 'react';
 import * as ReactRedux from 'react-redux';
 import {store} from './store/store.js';
 import {letters} from './sounds/sounds.js';
-import Login from './login/'
+import Login from './login/';
 
 const Provider = ReactRedux.Provider;
 
