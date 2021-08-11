@@ -126,7 +126,7 @@ func CreateNewUser(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func login(w http.ResponseWriter, r *http.Request) {
+func Login(w http.ResponseWriter, r *http.Request) {
   var u User
   // Decodes the JSON Data from the front-end
   err := json.NewDecoder(r.Body).Decode(&u)
@@ -147,7 +147,6 @@ func login(w http.ResponseWriter, r *http.Request) {
     http.Error(w, "Username doesn't exist.", http.StatusBadRequest)
     return
   }
-
 
   // Make a hash from the incoming password
   h := sha1.New()
@@ -376,7 +375,7 @@ func main() {
 
   mux := http.NewServeMux()
   mux.HandleFunc("/user/create", CreateNewUser)
-  mux.HandleFunc("/user/login", login)
+  mux.HandleFunc("/user/login", Login)
   mux.HandleFunc("/user/refresh", refreshToken)
   mux.HandleFunc("/data/sessions", retriveSessionData)
   err := http.ListenAndServe(":4000", mux)

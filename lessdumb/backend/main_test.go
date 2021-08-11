@@ -8,9 +8,13 @@ import (
   "net/http"
   "testing"
   "bytes"
+
 )
 
-var user User
+var (
+  user User
+  cookie *http.Cookie
+)
 
 const letterBytes = "1234567890_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
@@ -66,7 +70,41 @@ func TestCreateNewUser(t *testing.T) {
   // Access the database and checks if the user was created
   var query string
   err = database.QueryRow(`SELECT username FROM users WHERE username = ?`, u.Username).Scan(&query)
+  // Checks if the username retrived from the DB
+  // is the same that the generated
   if query != u.Username {
     t.Errorf("The username was not created: got %v want %v", query, u.Username)
   }
+}
+
+func TestLogin(t *testing.T) {
+  setup()
+  defer database.Close()
+  // Creates a JSON str to do the login
+  jsonStr, err := json.Marshal(&user)
+  if err != nil {
+    t.Errorf("Error creating JSON from user struct.")
+  }
+
+  req, err := http.NewRequest("POST", "http://localhost:4000/user/login", bytes.NewBuffer(jsonStr))
+  // Sets the header
+  req.Header.Set("Content-Type", "application/json")
+  // Creates a recorder
+  rr := httptest.NewRecorder()
+  // ??
+  handler := http.HandlerFunc(Login)
+  // Hits the API's endpoint
+  handler.ServeHTTP(rr, req)
+  // Checks if the httprequest's status is OK
+  if status := rr.Code; status != http.StatusOK {
+		t.Errorf("Handler returned wrong status code: got %v want %v",
+			status, http.StatusOK)
+	}
+  // Gets the http response from http request
+  httpResponse := rr.Result()
+  // Extract the cookies from
+  cookies := httpResponse.Cookies()
+  // Saves the cookie for further testing
+  cookie = cookies[0]
+  
 }
