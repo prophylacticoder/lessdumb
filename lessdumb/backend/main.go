@@ -32,11 +32,33 @@ type Claims struct {
 	jwt.StandardClaims
 }
 
+type Session struct {
+  Performance float64
+  Date string
+  Level int
+}
+
 var database *sql.DB
 // JWT's key
 var jwtKey = []byte("key")
 
-func createNewUser(w http.ResponseWriter, r *http.Request) {
+func setup() {
+  // Open the database
+  var err error
+  database, err = sql.Open("sqlite3", "./bogo.db")
+  if err != nil {
+    panic("Error in openning the database!")
+  }
+  // Prepare and execute the statement that will create the tables
+  // if they don't exist
+  query := `CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, username VARCHAR UNIQUE, password VARCHAR, email VARCHAR UNIQUE, country VARCHAR, birthday DATETIME, creationDate DATETIME);
+            CREATE TABLE IF NOT EXISTS scores (id INTEGER PRIMARY KEY, userid INTEGER, performance FLOAT, date DATETIME, level TINYINT, FOREIGN KEY(userid) REFERENCES users(id));
+            CREATE TABLE IF NOT EXISTS performance (id INTEGER PRIMARY KEY, userid INTEGER, average FLOAT, date DATETIME, FOREIGN KEY(userid) REFERENCES users(id));`
+  statement, _ := database.Prepare(query)
+  statement.Exec()
+}
+
+func CreateNewUser(w http.ResponseWriter, r *http.Request) {
   var u NewUser
   // Decodes the JSON Data from the front-end
   err := json.NewDecoder(r.Body).Decode(&u)
@@ -157,7 +179,7 @@ func login(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-
+  // Sets the cookie
   http.SetCookie(w, &http.Cookie{
 		Name:    "token",
 		Value:   tokenString,
@@ -167,23 +189,197 @@ func login(w http.ResponseWriter, r *http.Request) {
   spew.Dump(u)
 }
 
-func main() {
-
-  // Open the database
-  var err error
-  database, err = sql.Open("sqlite3", "./bogo.db")
+func refreshToken(w http.ResponseWriter, r *http.Request) {
+  // Obatins the token from the request
+  c, err := r.Cookie("token")
   if err != nil {
-    panic("Error in openning the database!")
+    if err == http.ErrNoCookie {
+    // If the cookie is not set, return an unauthorized status
+      w.WriteHeader(http.StatusUnauthorized)
+      return
+    }
+  // For any other type of error, return a bad request status
+    w.WriteHeader(http.StatusBadRequest)
+  return
   }
+
+  // Get the JWT string from the cookie
+	tknStr := c.Value
+
+  // Initialize a new instance of `Claims`
+  claims := &Claims{}
+
+  // Parse the token
+  tkn, err := jwt.ParseWithClaims(tknStr, claims, func(token *jwt.Token) (interface{}, error) {
+		return jwtKey, nil
+	})
+	if err != nil {
+		if err == jwt.ErrSignatureInvalid {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if !tkn.Valid {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+  // If the token expiration time lasts more than 30 seconds
+  // Sends an bad request Error
+  if time.Unix(claims.ExpiresAt, 0).Sub(time.Now()) > 30*time.Second {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+  // Now, create a new token for the current use, with a renewed expiration time
+	expirationTime := time.Now().Add(15 * time.Minute)
+	claims.ExpiresAt = expirationTime.Unix()
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString(jwtKey)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// Set the new token as the users `token` cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:    "token",
+		Value:   tokenString,
+		Expires: expirationTime,
+	})
+}
+
+func addSessionData(w http.ResponseWriter, r *http.Request) {
+  // Obtains the token from the request
+  c, err := r.Cookie("token")
+  if err != nil {
+    if err == http.ErrNoCookie {
+    // If the cookie is not set, return an unauthorized status
+      w.WriteHeader(http.StatusUnauthorized)
+      return
+    }
+  // For any other type of error, return a bad request status
+    w.WriteHeader(http.StatusBadRequest)
+  return
+  }
+
+  // Get the JWT string from the cookie
+  tknStr := c.Value
+
+  // Initialize a new instance of `Claims`
+  claims := &Claims{}
+
+  // Parse the token
+  tkn, err := jwt.ParseWithClaims(tknStr, claims, func(token *jwt.Token) (interface{}, error) {
+    return jwtKey, nil
+  })
+  if err != nil {
+    if err == jwt.ErrSignatureInvalid {
+      w.WriteHeader(http.StatusUnauthorized)
+      return
+    }
+    w.WriteHeader(http.StatusBadRequest)
+    return
+  }
+  if !tkn.Valid {
+    w.WriteHeader(http.StatusUnauthorized)
+    return
+  }
+
+  var session Session
+
+  // Decodes the JSON Data from the front-end
+  err = json.NewDecoder(r.Body).Decode(&session)
+  if err != nil {
+    http.Error(w, err.Error(), http.StatusBadRequest)
+    return
+  }
+
+  var count int
+  // Check how many rows there is in the database
+  err = database.QueryRow("SELECT COUNT(*) FROM performance JOIN users ON users.id=performance.userid WHERE users.username = ?", claims.Username).Scan(&count)
+  switch {
+    case err != nil:
+      w.WriteHeader(http.StatusInternalServerError)
+      return
+    // case count < 10:
+    //   database.Prepare(`INSERT INTO `)
+  }
+
+}
+
+func retriveSessionData(w http.ResponseWriter, r *http.Request) {
+  // Obtains the token from the request
+  c, err := r.Cookie("token")
+  if err != nil {
+    if err == http.ErrNoCookie {
+    // If the cookie is not set, return an unauthorized status
+      w.WriteHeader(http.StatusUnauthorized)
+      return
+    }
+  // For any other type of error, return a bad request status
+    w.WriteHeader(http.StatusBadRequest)
+  return
+  }
+
+  // Get the JWT string from the cookie
+	tknStr := c.Value
+
+  // Initialize a new instance of `Claims`
+  claims := &Claims{}
+
+  // Parse the token
+  tkn, err := jwt.ParseWithClaims(tknStr, claims, func(token *jwt.Token) (interface{}, error) {
+		return jwtKey, nil
+	})
+	if err != nil {
+		if err == jwt.ErrSignatureInvalid {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if !tkn.Valid {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+  // Query the user's sessions data from the database
+  rows, err := database.Query(`SELECT scores.performance, scores.date, scores.level FROM users JOIN scores ON users.id=scores.userid WHERE users.username = ?`, claims.Username)
+  if err != nil {
+    w.WriteHeader(http.StatusInternalServerError)
+    return
+  }
+  defer rows.Close()
+  // Declare a slice of struct(Session)
+  var sessions []Session
+  // Iterates over the rows
+  for rows.Next() {
+    var s Session
+    if err := rows.Scan(&s.Performance, &s.Date, &s.Level); err != nil {
+      w.WriteHeader(http.StatusInternalServerError)
+      return
+    }
+    sessions = append(sessions, s)
+  }
+
+  // Converts struct into json
+  jsonData, _ := json.Marshal(sessions)
+  spew.Dump(jsonData)
+}
+
+func main() {
+  // Connects to the database
+  setup()
   defer database.Close()
-  // Prepare and execute the statement that will create the table
-  // if it doesn't exist
-  statement, _ := database.Prepare("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, username VARCHAR UNIQUE, password VARCHAR, email VARCHAR UNIQUE, country VARCHAR, birthday DATETIME, creationDate DATETIME)")
-  statement.Exec()
+
   mux := http.NewServeMux()
-  mux.HandleFunc("/user/create", createNewUser)
+  mux.HandleFunc("/user/create", CreateNewUser)
   mux.HandleFunc("/user/login", login)
-  err = http.ListenAndServe(":4000", mux)
+  mux.HandleFunc("/user/refresh", refreshToken)
+  mux.HandleFunc("/data/sessions", retriveSessionData)
+  err := http.ListenAndServe(":4000", mux)
   if err != nil {
     log.Fatal(err)
   }
