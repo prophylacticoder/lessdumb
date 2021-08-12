@@ -172,6 +172,54 @@ func TestAddSession(t *testing.T) {
   			status, http.StatusOK)
   	}
   }
+}
 
+func TestRetriveSessions(t *testing.T) {
+  setup()
+  defer database.Close()
+  // Creates the request
+  req, err := http.NewRequest("POST", "http://localhost:4000/data/sessions", nil)
+  if err != nil {
+    panic("Error creating /data/sessions request.")
+  }
+  // Adds cookie
+  req.AddCookie(cookie)
+  // Creates a recorder
+  rr := httptest.NewRecorder()
+  // ??
+  handler := http.HandlerFunc(RetriveSessions)
+  // Hits the API's endpoint
+  handler.ServeHTTP(rr, req)
+  // Checks if the httprequest's status is OK
+  if status := rr.Code; status != http.StatusOK {
+    t.Errorf("Handler returned wrong status code: got %v want %v",
+      status, http.StatusOK)
+  }
+  // Checks if the JSON was received
+  if rr.Body == nil {
+    t.Errorf("JSON wasn't received.")
+  }
+}
 
+func TestDeleteUser(t *testing.T) {
+  setup()
+  defer database.Close()
+  // Creates the request
+  req, err := http.NewRequest("POST", "http://localhost:4000/data/sessions", nil)
+  if err != nil {
+    panic("Error creating /data/sessions request.")
+  }
+  // Adds cookie
+  req.AddCookie(cookie)
+  // Creates a recorder
+  rr := httptest.NewRecorder()
+  // ??
+  handler := http.HandlerFunc(DeleteUser)
+  // Hits the API's endpoint
+  handler.ServeHTTP(rr, req)
+  // Checks if the httprequest's status is OK
+  if status := rr.Code; status != http.StatusOK {
+    t.Errorf("Handler returned wrong status code: got %v want %v",
+      status, http.StatusOK)
+  }
 }

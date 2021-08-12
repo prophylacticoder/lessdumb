@@ -37,6 +37,11 @@ type Session struct {
   Level int
 }
 
+type SessionWithDate struct {
+  Session
+  Date string
+}
+
 var database *sql.DB
 // JWT's key
 var jwtKey = []byte("key")
@@ -320,7 +325,7 @@ func AddSession(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func RetriveSessionData(w http.ResponseWriter, r *http.Request) {
+func RetriveSessions(w http.ResponseWriter, r *http.Request) {
   // Obtains the token from the request
   c, err := r.Cookie("token")
   if err != nil {
@@ -356,28 +361,76 @@ func RetriveSessionData(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
+
   // Query the user's sessions data from the database
-  rows, err := database.Query(`SELECT scores.performance, scores.date, scores.level FROM users JOIN scores ON users.id=scores.userid WHERE users.username = ?`, claims.Username)
+  rows, err := database.Query(`SELECT scores.performance, scores.date, scores.level FROM scores JOIN users ON users.id=scores.userid WHERE users.username = ? ORDER BY (date)`, claims.Username)
   if err != nil {
     w.WriteHeader(http.StatusInternalServerError)
     return
   }
   defer rows.Close()
   // Declare a slice of struct(Session)
-  var sessions []Session
+  var sessions []SessionWithDate
   // Iterates over the rows
   for rows.Next() {
-    var s Session
-    // if err := rows.Scan(&s.Performance, &s.Date, &s.Level); err != nil {
-    //   w.WriteHeader(http.StatusInternalServerError)
-    //   return
-    // }
+    var s SessionWithDate
+    if err := rows.Scan(&s.Performance, &s.Date, &s.Level); err != nil {
+      w.WriteHeader(http.StatusInternalServerError)
+      return
+    }
     sessions = append(sessions, s)
   }
 
   // Converts struct into json
   jsonData, _ := json.Marshal(sessions)
-  spew.Dump(jsonData)
+  w.Write(jsonData)
+}
+
+func DeleteUser(w http.ResponseWriter, r *http.Request) {
+  // Obtains the token from the request
+  c, err := r.Cookie("token")
+  if err != nil {
+    if err == http.ErrNoCookie {
+    // If the cookie is not set, return an unauthorized status
+      w.WriteHeader(http.StatusUnauthorized)
+      return
+    }
+  // For any other type of error, return a bad request status
+    w.WriteHeader(http.StatusBadRequest)
+  return
+  }
+  // Get the JWT string from the cookie
+  tknStr := c.Value
+  // Initialize a new instance of `Claims`
+  claims := &Claims{}
+
+  // Parse the token
+  tkn, err := jwt.ParseWithClaims(tknStr, claims, func(token *jwt.Token) (interface{}, error) {
+    return jwtKey, nil
+  })
+  if err != nil {
+    if err == jwt.ErrSignatureInvalid {
+      w.WriteHeader(http.StatusUnauthorized)
+      return
+    }
+    w.WriteHeader(http.StatusBadRequest)
+    return
+  }
+  if !tkn.Valid {
+    w.WriteHeader(http.StatusUnauthorized)
+    return
+  }
+  var userID int
+  database.QueryRow(`SELECT id FROM users WHERE username = ?`, claims.Username).Scan(&userID)
+  // Deletes from the users table
+  statement, _ := database.Prepare(`DELETE FROM users WHERE id = ?`)
+  statement.Exec(userID)
+  // Deletes from the scores table
+  statement, _ = database.Prepare(`DELETE FROM scores WHERE userid = ?`)
+  statement.Exec(userID)
+  // Deletes from the performance table
+  statement, _ = database.Prepare(`DELETE FROM performance WHERE userID = ?`)
+  statement.Exec(userID)
 }
 
 func main() {
@@ -389,8 +442,9 @@ func main() {
   mux.HandleFunc("/user/create", CreateNewUser)
   mux.HandleFunc("/user/login", Login)
   mux.HandleFunc("/user/refresh", RefreshToken)
-  mux.HandleFunc("/data/sessions", RetriveSessionData)
+  mux.HandleFunc("/data/sessions", RetriveSessions)
   mux.HandleFunc("/data/addsession", AddSession)
+  mux.HandleFunc("/data/delete", DeleteUser)
   err := http.ListenAndServe(":4000", mux)
   if err != nil {
     log.Fatal(err)
