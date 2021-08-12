@@ -106,5 +106,72 @@ func TestLogin(t *testing.T) {
   cookies := httpResponse.Cookies()
   // Saves the cookie for further testing
   cookie = cookies[0]
-  
+}
+
+func TestRefreshToken(t *testing.T) {
+  // Creates the POST request
+  req, err := http.NewRequest("POST", "http://localhost:4000/user/refresh", nil)
+  if err != nil {
+    panic("Error creating /user/refresh request.")
+  }
+  // Adds the cookie to the req
+  req.AddCookie(cookie)
+  // Creates a recorder
+  rr := httptest.NewRecorder()
+  // ??
+  handler := http.HandlerFunc(RefreshToken)
+  // Puts the execution to wait
+  time.Sleep(30 * time.Second)
+  // Hits the API's endpoint
+  handler.ServeHTTP(rr, req)
+  if status := rr.Code; status != http.StatusOK {
+		t.Errorf("Handler returned wrong status code: got %v want %v",
+			status, http.StatusOK)
+	}
+  // Updates cookie = refreshed cookie
+  httpResponse := rr.Result()
+  cookies := httpResponse.Cookies()
+  if cookies == nil {
+    t.Errorf("New cookie was not received.")
+  }
+  cookie = cookies[0]
+}
+
+func TestAddSession(t *testing.T) {
+  setup()
+  defer database.Close()
+  for i := 0; i < 11; i++ {
+    if i == 10 {
+      // Wait for 5 seconds and test the update function
+      time.Sleep(5 * time.Second)
+    }
+    var session Session
+    // Permeates session's structure with random data
+    session.Performance = 1 + rand.Float32() * 100
+    session.Level = rand.Intn(99) + 1
+    // Converts to JSON
+    jsonStr, _ := json.Marshal(&session)
+    // Creates the request
+    req, err := http.NewRequest("POST", "http://localhost:4000/data/addsession", bytes.NewBuffer(jsonStr))
+    if err != nil {
+      panic("Error creating /data/addsession request.")
+    }
+    // Sets the header
+    req.Header.Set("Content-Type", "application/json")
+    // Adds cookie
+    req.AddCookie(cookie)
+    // Creates a recorder
+    rr := httptest.NewRecorder()
+    // ??
+    handler := http.HandlerFunc(AddSession)
+    // Hits the API's endpoint
+    handler.ServeHTTP(rr, req)
+    // Checks if the httprequest's status is OK
+    if status := rr.Code; status != http.StatusOK {
+  		t.Errorf("Handler returned wrong status code: got %v want %v",
+  			status, http.StatusOK)
+  	}
+  }
+
+
 }

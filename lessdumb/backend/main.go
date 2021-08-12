@@ -33,8 +33,7 @@ type Claims struct {
 }
 
 type Session struct {
-  Performance float64
-  Date string
+  Performance float32
   Level int
 }
 
@@ -123,7 +122,10 @@ func CreateNewUser(w http.ResponseWriter, r *http.Request) {
   // Inserts into the database the newuser
   statement, _ := database.Prepare("INSERT INTO users(username, password, email, country, birthday, creationDate) VALUES (?, ?, ?, ?, ?, ?)")
   _, err = statement.Exec(u.Username, hashedPassword, u.Email, u.Country, birthday, creationTime)
-
+  if err != nil {
+    w.WriteHeader(http.StatusInternalServerError)
+		return
+  }
 }
 
 func Login(w http.ResponseWriter, r *http.Request) {
@@ -160,7 +162,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
     return
   }
   // Defines the JWT lifetime
-  expirationTime := time.Now().Add(15 * time.Minute)
+  expirationTime := time.Now().Add(31 * time.Second)
   // ??
   claims := &Claims{
 		Username: u.Username,
@@ -188,7 +190,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
   spew.Dump(u)
 }
 
-func refreshToken(w http.ResponseWriter, r *http.Request) {
+func RefreshToken(w http.ResponseWriter, r *http.Request) {
   // Obatins the token from the request
   c, err := r.Cookie("token")
   if err != nil {
@@ -226,7 +228,7 @@ func refreshToken(w http.ResponseWriter, r *http.Request) {
 	}
   // If the token expiration time lasts more than 30 seconds
   // Sends an bad request Error
-  if time.Unix(claims.ExpiresAt, 0).Sub(time.Now()) > 30*time.Second {
+  if time.Unix(claims.ExpiresAt, 0).Sub(time.Now()) > 15 * time.Second {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -249,7 +251,8 @@ func refreshToken(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func addSessionData(w http.ResponseWriter, r *http.Request) {
+func AddSession(w http.ResponseWriter, r *http.Request) {
+
   // Obtains the token from the request
   c, err := r.Cookie("token")
   if err != nil {
@@ -296,19 +299,28 @@ func addSessionData(w http.ResponseWriter, r *http.Request) {
   }
 
   var count int
-  // Check how many rows there is in the database
-  err = database.QueryRow("SELECT COUNT(*) FROM performance JOIN users ON users.id=performance.userid WHERE users.username = ?", claims.Username).Scan(&count)
+  // Check how many rows there are in the database
+  err = database.QueryRow("SELECT COUNT(*) FROM scores JOIN users ON users.id=scores.userid WHERE users.username = ?", claims.Username).Scan(&count)
+  // Retrives the userID
+  var userID int
+  database.QueryRow(`SELECT ID FROM users WHERE username = ?`, claims.Username).Scan(&userID)
   switch {
     case err != nil:
       w.WriteHeader(http.StatusInternalServerError)
       return
-    // case count < 10:
-    //   database.Prepare(`INSERT INTO `)
+    case count < 10:
+      // If there are less than 10 entries, add more
+      statement, _ := database.Prepare(`INSERT INTO scores (userID, performance, date, level) VALUES (?, ?, ?, ?)`)
+      statement.Exec(userID, session.Performance, time.Now(), session.Level)
+    case count >= 10:
+      // If there are more or equal than ten entries, update the oldest one
+      statement, _ := database.Prepare(`UPDATE scores SET performance = ?, date = ?, level = ? WHERE id=(SELECT Id FROM scores WHERE userid=? ORDER BY date LIMIT 1)`)
+      statement.Exec(session.Performance, time.Now(), session.Level, userID)
   }
 
 }
 
-func retriveSessionData(w http.ResponseWriter, r *http.Request) {
+func RetriveSessionData(w http.ResponseWriter, r *http.Request) {
   // Obtains the token from the request
   c, err := r.Cookie("token")
   if err != nil {
@@ -356,10 +368,10 @@ func retriveSessionData(w http.ResponseWriter, r *http.Request) {
   // Iterates over the rows
   for rows.Next() {
     var s Session
-    if err := rows.Scan(&s.Performance, &s.Date, &s.Level); err != nil {
-      w.WriteHeader(http.StatusInternalServerError)
-      return
-    }
+    // if err := rows.Scan(&s.Performance, &s.Date, &s.Level); err != nil {
+    //   w.WriteHeader(http.StatusInternalServerError)
+    //   return
+    // }
     sessions = append(sessions, s)
   }
 
@@ -376,8 +388,9 @@ func main() {
   mux := http.NewServeMux()
   mux.HandleFunc("/user/create", CreateNewUser)
   mux.HandleFunc("/user/login", Login)
-  mux.HandleFunc("/user/refresh", refreshToken)
-  mux.HandleFunc("/data/sessions", retriveSessionData)
+  mux.HandleFunc("/user/refresh", RefreshToken)
+  mux.HandleFunc("/data/sessions", RetriveSessionData)
+  mux.HandleFunc("/data/addsession", AddSession)
   err := http.ListenAndServe(":4000", mux)
   if err != nil {
     log.Fatal(err)
