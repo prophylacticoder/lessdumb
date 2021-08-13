@@ -367,7 +367,68 @@ func AddSession(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func RetriveSessions(w http.ResponseWriter, r *http.Request) {
+func RetrieveGraph(w http.ResponseWriter, r *http.Request) {
+  // Obtains the token from the request
+  c, err := r.Cookie("token")
+  if err != nil {
+    if err == http.ErrNoCookie {
+    // If the cookie is not set, return an unauthorized status
+      w.WriteHeader(http.StatusUnauthorized)
+      return
+    }
+  // For any other type of error, return a bad request status
+    w.WriteHeader(http.StatusBadRequest)
+  return
+  }
+
+  // Get the JWT string from the cookie
+	tknStr := c.Value
+
+  // Initialize a new instance of `Claims`
+  claims := &Claims{}
+
+  // Parse the token
+  tkn, err := jwt.ParseWithClaims(tknStr, claims, func(token *jwt.Token) (interface{}, error) {
+		return jwtKey, nil
+	})
+	if err != nil {
+		if err == jwt.ErrSignatureInvalid {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if !tkn.Valid {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+  // Creates a slice of an anonymous struct which will be converted
+  // To a JSON
+  graph := []struct {
+    average float32
+    date string
+  }{}
+
+  var userID int
+  database.QueryRow(`SELECT id FROM users WHERE username = ?`, claims.Username).Scan(&userID)
+  rows, _ := database.Query(`SELECT average, date FROM performance WHERE userID = ? ORDER BY date`, userID)
+
+  for rows.Next() {
+    g := struct {
+      average float32
+      date string
+    }{}
+    // Map the values to the struct
+    rows.Scan(&g.average, &g.date)
+    // Append the value to the graph slice
+    graph = append(graph, g)
+  }
+  jsonData, _ := json.Marshal(graph)
+  w.Write(jsonData)
+}
+
+func RetrieveSessions(w http.ResponseWriter, r *http.Request) {
   // Obtains the token from the request
   c, err := r.Cookie("token")
   if err != nil {
@@ -462,17 +523,17 @@ func DeleteUser(w http.ResponseWriter, r *http.Request) {
     w.WriteHeader(http.StatusUnauthorized)
     return
   }
-  // var userID int
-  // database.QueryRow(`SELECT id FROM users WHERE username = ?`, claims.Username).Scan(&userID)
-  // // Deletes from the users table
-  // statement, _ := database.Prepare(`DELETE FROM users WHERE id = ?`)
-  // statement.Exec(userID)
-  // // Deletes from the scores table
-  // statement, _ = database.Prepare(`DELETE FROM scores WHERE userid = ?`)
-  // statement.Exec(userID)
-  // // Deletes from the performance table
-  // statement, _ = database.Prepare(`DELETE FROM performance WHERE userID = ?`)
-  // statement.Exec(userID)
+  var userID int
+  database.QueryRow(`SELECT id FROM users WHERE username = ?`, claims.Username).Scan(&userID)
+  // Deletes from the users table
+  statement, _ := database.Prepare(`DELETE FROM users WHERE id = ?`)
+  statement.Exec(userID)
+  // Deletes from the scores table
+  statement, _ = database.Prepare(`DELETE FROM scores WHERE userid = ?`)
+  statement.Exec(userID)
+  // Deletes from the performance table
+  statement, _ = database.Prepare(`DELETE FROM performance WHERE userID = ?`)
+  statement.Exec(userID)
 }
 
 func main() {
@@ -485,8 +546,9 @@ func main() {
   mux.HandleFunc("/user/delete", DeleteUser)
   mux.HandleFunc("/user/login", Login)
   mux.HandleFunc("/user/refresh", RefreshToken)
-  mux.HandleFunc("/data/sessions", RetriveSessions)
+  mux.HandleFunc("/data/sessions", RetrieveSessions)
   mux.HandleFunc("/data/addsession", AddSession)
+  mux.HandleFunc("/data/graph", RetrieveGraph)
 
   err := http.ListenAndServe(":4000", mux)
   if err != nil {

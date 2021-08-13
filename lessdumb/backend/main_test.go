@@ -174,7 +174,7 @@ func TestAddSession(t *testing.T) {
   }
 }
 
-func TestRetriveSessions(t *testing.T) {
+func TestRetrieveSessions(t *testing.T) {
   setup()
   defer database.Close()
   // Creates the request
@@ -187,7 +187,7 @@ func TestRetriveSessions(t *testing.T) {
   // Creates a recorder
   rr := httptest.NewRecorder()
   // ??
-  handler := http.HandlerFunc(RetriveSessions)
+  handler := http.HandlerFunc(RetrieveSessions)
   // Hits the API's endpoint
   handler.ServeHTTP(rr, req)
   // Checks if the httprequest's status is OK
@@ -199,6 +199,33 @@ func TestRetriveSessions(t *testing.T) {
   if rr.Body == nil {
     t.Errorf("JSON wasn't received.")
   }
+}
+
+func TestRetrieveGraph(t *testing.T) {
+  setup()
+  defer database.Close()
+  req, err := http.NewRequest("POST", "http://localhost:4000/data/sessions", nil)
+  if err != nil {
+    panic("Error creating /data/graph request.")
+  }
+  // Adds cookie
+  req.AddCookie(cookie)
+  // Creates a recorder
+  rr := httptest.NewRecorder()
+  // ??
+  handler := http.HandlerFunc(RetrieveGraph)
+  // Hits the API's endpoint
+  handler.ServeHTTP(rr, req)
+  // Checks if the httprequest's status is OK
+  if status := rr.Code; status != http.StatusOK {
+    t.Errorf("Handler returned wrong status code: got %v want %v",
+      status, http.StatusOK)
+  }
+  // Checks if the JSON was received
+  if rr.Body == nil {
+    t.Errorf("JSON wasn't received.")
+  }
+
 }
 
 func TestDeleteUser(t *testing.T) {
