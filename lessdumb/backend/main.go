@@ -303,12 +303,54 @@ func AddSession(w http.ResponseWriter, r *http.Request) {
     return
   }
 
-  var count int
-  // Check how many rows there are in the database
+  var (
+    count int
+    lastDate string
+    performance float32
+    userID int
+  )
+  // Checks how many rows there are in the database
   err = database.QueryRow("SELECT COUNT(*) FROM scores JOIN users ON users.id=scores.userid WHERE users.username = ?", claims.Username).Scan(&count)
   // Retrives the userID
-  var userID int
   database.QueryRow(`SELECT ID FROM users WHERE username = ?`, claims.Username).Scan(&userID)
+  // Checks if there is an entry for today's performance
+  database.QueryRow(`SELECT average, date FROM performance WHERE userid=? ORDER BY date DESC LIMIT 1`, userID).Scan(&performance, &lastDate)
+
+  switch {
+    // It is not the first entry of the day
+    // So calculate the average and store it
+  case lastDate != "" && lastDate[:10] == time.Now().String()[:10]:
+      var c int
+      database.QueryRow(`SELECT COUNT(*) FROM performance WHERE userid=?`, userID).Scan(&c)
+      if newAverage := (performance + (session.Performance / 100) + float32(session.Level)) / 2; c >= 30 {
+          var id int
+          // Gets the entry's ID for UPDATING
+          database.QueryRow(`SELECT id FROM performance WHERE userID=? ORDER BY date LIMIT 1`, userID).Scan(&id)
+          // Updates the oldest
+          statement, _ := database.Prepare(`UPDATE performance SET average = ?, date = ? WHERE id = ?`)
+          statement.Exec(newAverage, time.Now())
+      } else {
+        // If there is less than 30 entries, creates a new one
+        statement, _ := database.Prepare(`INSERT INTO performance (userid, average, date) VALUES (?, ?, ?)`)
+        statement.Exec(userID, newAverage, time.Now())
+      }
+    // If it is the first entry of the day
+  case lastDate == "" || lastDate[:10] != time.Now().String()[:10]:
+      var c int
+      database.QueryRow(`SELECT COUNT(*) FROM performance WHERE userid=?`, userID).Scan(&c)
+      // If the database holds more than 30 entries then update it
+      if c >= 30 {
+        var id int
+        database.QueryRow(`SELECT id FROM performance WHERE userid=? ORDER BY date DESC LIMIT 1`, userID).Scan(&id)
+        statement, _ := database.Prepare(`UPDATE performance SET average = ?, date = ? WHERE id = ?`)
+        statement.Exec(session.Performance / 100 + float32(session.Level), time.Now())
+      } else {
+        // Otherwise creates a new entry
+        statement, _ := database.Prepare(`INSERT INTO performance (userid, average, date) VALUES (?, ?, ?)`)
+        statement.Exec(userID, session.Performance / 100 + float32(session.Level), time.Now())
+      }
+  }
+
   switch {
     case err != nil:
       w.WriteHeader(http.StatusInternalServerError)
@@ -420,17 +462,17 @@ func DeleteUser(w http.ResponseWriter, r *http.Request) {
     w.WriteHeader(http.StatusUnauthorized)
     return
   }
-  var userID int
-  database.QueryRow(`SELECT id FROM users WHERE username = ?`, claims.Username).Scan(&userID)
-  // Deletes from the users table
-  statement, _ := database.Prepare(`DELETE FROM users WHERE id = ?`)
-  statement.Exec(userID)
-  // Deletes from the scores table
-  statement, _ = database.Prepare(`DELETE FROM scores WHERE userid = ?`)
-  statement.Exec(userID)
-  // Deletes from the performance table
-  statement, _ = database.Prepare(`DELETE FROM performance WHERE userID = ?`)
-  statement.Exec(userID)
+  // var userID int
+  // database.QueryRow(`SELECT id FROM users WHERE username = ?`, claims.Username).Scan(&userID)
+  // // Deletes from the users table
+  // statement, _ := database.Prepare(`DELETE FROM users WHERE id = ?`)
+  // statement.Exec(userID)
+  // // Deletes from the scores table
+  // statement, _ = database.Prepare(`DELETE FROM scores WHERE userid = ?`)
+  // statement.Exec(userID)
+  // // Deletes from the performance table
+  // statement, _ = database.Prepare(`DELETE FROM performance WHERE userID = ?`)
+  // statement.Exec(userID)
 }
 
 func main() {
@@ -440,11 +482,12 @@ func main() {
 
   mux := http.NewServeMux()
   mux.HandleFunc("/user/create", CreateNewUser)
+  mux.HandleFunc("/user/delete", DeleteUser)
   mux.HandleFunc("/user/login", Login)
   mux.HandleFunc("/user/refresh", RefreshToken)
   mux.HandleFunc("/data/sessions", RetriveSessions)
   mux.HandleFunc("/data/addsession", AddSession)
-  mux.HandleFunc("/data/delete", DeleteUser)
+
   err := http.ListenAndServe(":4000", mux)
   if err != nil {
     log.Fatal(err)

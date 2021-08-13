@@ -140,7 +140,7 @@ func TestRefreshToken(t *testing.T) {
 func TestAddSession(t *testing.T) {
   setup()
   defer database.Close()
-  for i := 0; i < 11; i++ {
+  for i := 0; i < 35; i++ {
     if i == 10 {
       // Wait for 5 seconds and test the update function
       time.Sleep(5 * time.Second)
